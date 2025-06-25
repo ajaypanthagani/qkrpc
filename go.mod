@@ -1,4 +1,4 @@
-module qkrpc
+module github.com/ajaypanthagani/qkrpc
 
 go 1.24.3
 
