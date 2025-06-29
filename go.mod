@@ -8,6 +8,7 @@ require (
 )
 
 require (
+	github.com/golang/snappy v1.0.0 // indirect
 	go.uber.org/mock v0.5.0 // indirect
 	golang.org/x/crypto v0.26.0 // indirect
 	golang.org/x/mod v0.18.0 // indirect

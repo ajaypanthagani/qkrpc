@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 
+	"github.com/ajaypanthagani/qkrpc/codec"
 	"github.com/quic-go/quic-go"
 )
 
@@ -35,7 +36,7 @@ func (c *ClientConn) Call(ctx context.Context, method string) (*quic.Stream, err
 		return nil, err
 	}
 
-	if err := WriteString(stream, method); err != nil {
+	if err := codec.WriteString(stream, method); err != nil {
 		return nil, err
 	}
 

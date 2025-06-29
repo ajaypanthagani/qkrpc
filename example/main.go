@@ -6,6 +6,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/ajaypanthagani/qkrpc/codec"
 	"github.com/ajaypanthagani/qkrpc/example/proto"
 
 	"github.com/ajaypanthagani/qkrpc"
@@ -30,13 +31,13 @@ func runServer() {
 	// Register an RPC handler
 	server.RegisterHandler("echo.EchoService.SayHello", func(ctx context.Context, stream *quic.Stream) error {
 		var req proto.HelloRequest
-		if err := qkrpc.ReadProtobuf(stream, &req); err != nil {
+		if err := codec.ReadProtobuf(stream, &req); err != nil {
 			return err
 		}
 
 		log.Println("Server received:", req.Message)
 		resp := &proto.HelloResponse{Reply: "Hello, " + req.Message}
-		return qkrpc.WriteProtobuf(stream, resp)
+		return codec.WriteProtobuf(stream, resp)
 	})
 
 	log.Println("Starting server on :4242")
@@ -62,12 +63,12 @@ func runClient() {
 	}
 
 	req := &proto.HelloRequest{Message: "Ajay"}
-	if err := qkrpc.WriteProtobuf(stream, req); err != nil {
+	if err := codec.WriteProtobuf(stream, req); err != nil {
 		log.Fatal("Failed to write request:", err)
 	}
 
 	var resp proto.HelloResponse
-	if err := qkrpc.ReadProtobuf(stream, &resp); err != nil {
+	if err := codec.ReadProtobuf(stream, &resp); err != nil {
 		log.Fatal("Failed to read response:", err)
 	}
 

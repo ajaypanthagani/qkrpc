@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"log"
 
+	"github.com/ajaypanthagani/qkrpc/codec"
 	"github.com/quic-go/quic-go"
 )
 
@@ -65,7 +66,7 @@ func (s *qkServer) RegisterHandler(name string, handler func(context.Context, *q
 
 // HandleStream reads the method name from the stream and dispatches it to the registered handler.
 func (s *qkServer) HandleStream(stream *quic.Stream) {
-	methodName, err := ReadString(stream)
+	methodName, err := codec.ReadString(stream)
 
 	if err != nil {
 		log.Println("failed to read method name:", err)
