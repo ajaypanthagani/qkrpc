@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"time"
 
@@ -58,27 +57,21 @@ func runServer() {
 }
 
 func runClient() {
-	qkClient := qkrpc.NewQkClient(addr, tlsConfig)
+	qkClient := qkrpc.NewQkClient(addr, tlsConfig, protobufCodec)
+
 	err := qkClient.Dial(context.Background())
 	if err != nil {
 		log.Fatal("Dial failed:", err)
 	}
 
-	stream, err := qkClient.Call(context.Background(), "echo.EchoService.SayHello")
-	if err != nil {
-		log.Fatal("Call failed:", err)
-	}
-
 	req := &proto.HelloRequest{Message: "Ajay"}
+	resp := &proto.HelloResponse{}
 
-	if err := protobufCodec.Write(stream, req); err != nil {
-		log.Fatal("Failed to write request:", err)
+	err = qkClient.Call(context.Background(), "echo.EchoService.SayHello", req, resp)
+
+	if err != nil {
+		log.Fatal("Client received error:", err)
 	}
 
-	var resp proto.HelloResponse
-	if err := protobufCodec.Read(stream, &resp); err != nil {
-		log.Fatal("Failed to read response:", err)
-	}
-
-	fmt.Println("Client received:", resp.Reply)
+	log.Println("Client received reply: ", resp.Reply)
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"log"
 
 	"github.com/ajaypanthagani/qkrpc/codec"
 	"github.com/ajaypanthagani/qkrpc/compression"
@@ -12,15 +13,16 @@ import (
 
 type QkClient interface {
 	Dial(ctx context.Context) error
-	Call(ctx context.Context, method string) (*quic.Stream, error)
+	Call(ctx context.Context, method string, request any, response any) error
 }
 
-func NewQkClient(addr string, tlsConfig *tls.Config) QkClient {
+func NewQkClient(addr string, tlsConfig *tls.Config, c codec.Codec) QkClient {
 	stringCodec := codec.NewStringCodec(compression.NewSnappyCompressor())
 	return &qkClient{
 		addr:        addr,
 		tslConfig:   tlsConfig,
 		stringCodec: stringCodec,
+		codec:       c,
 	}
 }
 
@@ -28,6 +30,7 @@ type qkClient struct {
 	addr        string
 	tslConfig   *tls.Config
 	stringCodec codec.Codec
+	codec       codec.Codec
 	conn        *quic.Conn
 }
 
@@ -44,17 +47,27 @@ func (c *qkClient) Dial(ctx context.Context) error {
 	return nil
 }
 
-// Call opens a QUIC stream and writes the RPC method name as a length-prefixed string.
-func (c *qkClient) Call(ctx context.Context, method string) (*quic.Stream, error) {
+// Call opens a QUIC stream and call the RPC method.
+func (c *qkClient) Call(ctx context.Context, method string, request any, response any) error {
 	stream, err := c.conn.OpenStreamSync(ctx)
 
 	if err != nil {
-		return nil, err
+		return nil
 	}
 
 	if err := c.stringCodec.Write(stream, method); err != nil {
-		return nil, err
+		return err
 	}
 
-	return stream, nil
+	if err := c.codec.Write(stream, request); err != nil {
+		log.Fatal("Failed to write request:", err)
+		return err
+	}
+
+	if err := c.codec.Read(stream, response); err != nil {
+		log.Fatal("Failed to read response:", err)
+		return err
+	}
+
+	return nil
 }
