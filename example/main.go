@@ -10,8 +10,6 @@ import (
 	"github.com/ajaypanthagani/qkrpc/example/proto"
 
 	"github.com/ajaypanthagani/qkrpc"
-
-	"github.com/quic-go/quic-go"
 )
 
 func main() {
@@ -30,6 +28,17 @@ var (
 	tlsConfig, _  = qkrpc.LoadClientTLS("keys/cert.pem")
 )
 
+func newHelloRequestFunc() any {
+	return &proto.HelloRequest{}
+}
+
+func helloRequestHandlerFunc(ctx context.Context, req any) (resp any) {
+	helloReq := req.(*proto.HelloRequest)
+
+	log.Println("Server received:", helloReq.Message)
+	return &proto.HelloResponse{Reply: "Hello, " + helloReq.Message}
+}
+
 func runServer() {
 	tlsConfig, err := qkrpc.LoadTLSConfig("keys/cert.pem", "keys/key.pem")
 	if err != nil {
@@ -39,16 +48,7 @@ func runServer() {
 	server := qkrpc.NewQkServer(addr, tlsConfig, protobufCodec)
 
 	// Register an RPC handler
-	server.RegisterHandler("echo.EchoService.SayHello", func(ctx context.Context, stream *quic.Stream) error {
-		var req proto.HelloRequest
-		if err := protobufCodec.Read(stream, &req); err != nil {
-			return err
-		}
-
-		log.Println("Server received:", req.Message)
-		resp := &proto.HelloResponse{Reply: "Hello, " + req.Message}
-		return protobufCodec.Write(stream, resp)
-	})
+	server.RegisterHandler("echo.EchoService.SayHello", helloRequestHandlerFunc, newHelloRequestFunc)
 
 	log.Println("Starting server on :4242")
 	if err := server.Serve(); err != nil {
@@ -59,7 +59,7 @@ func runServer() {
 func runClient() {
 	qkClient := qkrpc.NewQkClient(addr, tlsConfig, protobufCodec)
 
-	err := qkClient.Dial(context.Background())
+	err := qkClient.Connect(context.Background())
 	if err != nil {
 		log.Fatal("Dial failed:", err)
 	}
@@ -67,6 +67,7 @@ func runClient() {
 	req := &proto.HelloRequest{Message: "Ajay"}
 	resp := &proto.HelloResponse{}
 
+	// call an RPC endpoint
 	err = qkClient.Call(context.Background(), "echo.EchoService.SayHello", req, resp)
 
 	if err != nil {

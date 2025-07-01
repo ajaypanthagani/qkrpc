@@ -12,7 +12,7 @@ import (
 )
 
 type QkClient interface {
-	Dial(ctx context.Context) error
+	Connect(ctx context.Context) error
 	Call(ctx context.Context, method string, request any, response any) error
 }
 
@@ -35,7 +35,7 @@ type qkClient struct {
 }
 
 // Dial establishes a QUIC connection to the given address using TLS config.
-func (c *qkClient) Dial(ctx context.Context) error {
+func (c *qkClient) Connect(ctx context.Context) error {
 	conn, err := quic.DialAddr(ctx, c.addr, c.tslConfig, nil)
 
 	if err != nil {
@@ -49,23 +49,29 @@ func (c *qkClient) Dial(ctx context.Context) error {
 
 // Call opens a QUIC stream and call the RPC method.
 func (c *qkClient) Call(ctx context.Context, method string, request any, response any) error {
+	if c.conn == nil {
+		return fmt.Errorf("connection not established")
+	}
+
 	stream, err := c.conn.OpenStreamSync(ctx)
 
 	if err != nil {
-		return nil
+		log.Println("Error opening stream to write request:", err)
+		return err
 	}
 
 	if err := c.stringCodec.Write(stream, method); err != nil {
+		log.Println("Error opening stream to write request:", err)
 		return err
 	}
 
 	if err := c.codec.Write(stream, request); err != nil {
-		log.Fatal("Failed to write request:", err)
+		log.Println("Failed to write request:", err)
 		return err
 	}
 
 	if err := c.codec.Read(stream, response); err != nil {
-		log.Fatal("Failed to read response:", err)
+		log.Println("Failed to read response:", err)
 		return err
 	}
 

@@ -12,7 +12,7 @@ import (
 
 type QkServer interface {
 	Serve() error
-	RegisterHandler(name string, handler func(context.Context, *quic.Stream) error)
+	RegisterHandler(name string, handlerFunc func(context.Context, any) any, newReqFunc func() any)
 	HandleStream(stream *quic.Stream)
 }
 
@@ -26,12 +26,17 @@ func NewQkServer(addr string, tlsConfig *tls.Config, c codec.Codec) QkServer {
 	}
 }
 
+type Handler struct {
+	HandlerFunc func(context.Context, any) any
+	NewReqFunc  func() any
+}
+
 type qkServer struct {
 	addr        string
 	tls         *tls.Config
 	codec       codec.Codec
 	stringCodec codec.Codec
-	handlers    map[string]func(context.Context, *quic.Stream) error
+	handlers    map[string]Handler
 }
 
 // Serve starts the QUIC server and handles incoming connections and streams.
@@ -63,10 +68,16 @@ func (s *qkServer) Serve() error {
 }
 
 // RegisterHandler registers a handler with a name
-func (s *qkServer) RegisterHandler(name string, handler func(context.Context, *quic.Stream) error) {
+func (s *qkServer) RegisterHandler(name string, handlerFunc func(context.Context, any) any, newReqFunc func() any) {
 	if s.handlers == nil {
-		s.handlers = make(map[string]func(context.Context, *quic.Stream) error)
+		s.handlers = make(map[string]Handler)
 	}
+
+	handler := Handler{
+		HandlerFunc: handlerFunc,
+		NewReqFunc:  newReqFunc,
+	}
+
 	s.handlers[name] = handler
 }
 
@@ -87,7 +98,14 @@ func (s *qkServer) HandleStream(stream *quic.Stream) {
 	}
 
 	ctx := context.Background()
-	if err := handler(ctx, stream); err != nil {
-		log.Println("handler error:", err)
+	req := handler.NewReqFunc()
+
+	if err := s.codec.Read(stream, req); err != nil {
+		log.Println("failed to read req:", err)
+		return
 	}
+
+	resp := handler.HandlerFunc(ctx, req)
+
+	s.codec.Write(stream, resp)
 }
