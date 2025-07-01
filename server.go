@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/ajaypanthagani/qkrpc/codec"
+	"github.com/ajaypanthagani/qkrpc/compression"
 	"github.com/quic-go/quic-go"
 )
 
@@ -15,17 +16,22 @@ type QkServer interface {
 	HandleStream(stream *quic.Stream)
 }
 
-func NewQkServer(addr string, tlsConfig *tls.Config) QkServer {
+func NewQkServer(addr string, tlsConfig *tls.Config, c codec.Codec) QkServer {
+	stringCodec := codec.NewStringCodec(compression.NewSnappyCompressor())
 	return &qkServer{
-		addr: addr,
-		tls:  tlsConfig,
+		addr:        addr,
+		tls:         tlsConfig,
+		codec:       c,
+		stringCodec: stringCodec,
 	}
 }
 
 type qkServer struct {
-	addr     string
-	tls      *tls.Config
-	handlers map[string]func(context.Context, *quic.Stream) error
+	addr        string
+	tls         *tls.Config
+	codec       codec.Codec
+	stringCodec codec.Codec
+	handlers    map[string]func(context.Context, *quic.Stream) error
 }
 
 // Serve starts the QUIC server and handles incoming connections and streams.
@@ -66,7 +72,8 @@ func (s *qkServer) RegisterHandler(name string, handler func(context.Context, *q
 
 // HandleStream reads the method name from the stream and dispatches it to the registered handler.
 func (s *qkServer) HandleStream(stream *quic.Stream) {
-	methodName, err := codec.ReadString(stream)
+	var methodName string
+	err := s.stringCodec.Read(stream, &methodName)
 
 	if err != nil {
 		log.Println("failed to read method name:", err)
